@@ -1,0 +1,960 @@
+#include <stdio.h>
+#include <allegro5\allegro.h>
+#include <allegro5\allegro_image.h>
+#include <allegro5\allegro_font.h>
+#include <allegro5\allegro_ttf.h>
+#include <allegro5\allegro_primitives.h>
+#include <math.h>
+#include <stdlib.h>   
+#include <time.h>
+#include <ctype.h>
+//Declaracion de archivos
+FILE* leaderBoard;
+char fin=0;  //Variable que permite dar el fin.
+char fond = 0;
+int seleccion =0;
+int juego=0;
+char scoreBoard = 0;
+#define maxAST 20
+#define maxProject 10
+#define platillosEnemigos 3
+#define maxDisparoEnemigo 14
+typedef struct {
+    float x, y;
+    float vx, vy;
+    int activo;
+} Asteroide;
+Asteroide asteroides[maxAST];
+
+typedef struct {
+    float x, y;
+    float vx, vy;
+    float angulo;
+    int activo;
+} Projectil;
+Projectil proyectiles[maxProject];
+
+typedef struct {
+    float x, y;
+    float vx, vy;
+    int activo;
+    int disparoTimer;
+    float angulo;
+} Platillos;
+Platillos enemigos[platillosEnemigos];
+
+typedef struct {
+    float x, y;
+    float vx, vy;
+    int activo;
+} DisparoEnemigo;
+DisparoEnemigo disparosEnemigos[maxDisparoEnemigo];
+
+void limpiarSaltoLinea(char* linea)
+{
+    int i=0;
+    while(linea[i] != '\0')
+    {
+        if (linea[i] == '\n')
+        {
+            linea[i] = '\0';
+            break;
+        }
+        i++;
+    }
+}
+
+int leerLineasArchivo(FILE* archivo,char lineas[][30],int maxLineas)
+{
+    int total =0;
+    while(fgets(lineas[total],0,archivo))
+    {
+        limpiarSaltoLinea(lineas[total]);
+        total ++;
+        if(total >= maxLineas)
+            break;
+    }
+    return total;
+}
+void eleccion(int opc)
+{
+    switch(opc)
+    {
+        case 0:
+            juego =1;
+            break;
+        case 1:
+            seleccion = 1;
+            break;
+        case 2:
+            fin = 1;
+    }
+    return;
+}
+char inicia(void)
+{
+    char fin=0;
+    if(!al_init())
+    {
+        printf("No allegro");
+        fin = 1;
+    }
+    if(!al_init_image_addon())
+    {
+        printf("No se pueden inicializar im%cgenes", 160);
+        fin=1;
+    }
+    if(!al_init_font_addon()|| !al_init_ttf_addon())
+    {
+        printf("No se iniciaron las fuentes");
+        fin = 1;
+    }
+    if(!al_install_keyboard())
+    {
+        printf("No se instalo teclado");
+        fin = 1;
+    }
+    if(!al_init_primitives_addon())
+    {
+        printf("No se pudo iniciar primitives");
+        fin = 1;
+    }
+    return fin;
+}
+
+int main (void)
+{
+    
+    //Declaracion de variables ALLEGRO
+    ALLEGRO_DISPLAY *disp; //*disp es un apuntador a ALLEGRO_DISPLAY. ALLEGRO_DISPLAY es el tipo de dato compuesto. Es una especie de arreglo.
+    ALLEGRO_EVENT_QUEUE *eventos; //*eventos es un apuntador a ALLEGRO_EVENT_QUEUE.
+    ALLEGRO_EVENT evento; //eventos es una estructura. Este guarda el evento en si, y lo manda a *eventos.
+    ALLEGRO_BITMAP *fondo;
+    ALLEGRO_BITMAP *fondoPart;
+    ALLEGRO_BITMAP *Enter;
+    ALLEGRO_BITMAP *naveEnemiga;
+    ALLEGRO_BITMAP *LetraB;
+    ALLEGRO_BITMAP *icono;
+    ALLEGRO_BITMAP *nave;
+    ALLEGRO_BITMAP *imgAst;
+    ALLEGRO_BITMAP *proyectil;
+    ALLEGRO_FONT *fuenteTit;
+    ALLEGRO_FONT *fuenteSecc;
+    ALLEGRO_FONT *fuenteSubt;
+    ALLEGRO_FONT *fuenteExp;
+    ALLEGRO_FONT *fuentePeque;
+    ALLEGRO_TIMER *tempoA;
+    float P1=335,Q1=240,P2=715,Q2=340; // son para la seleccion de el menu 
+    char opc = 0; //seleccionar la opcion del menu
+    fin= inicia();
+    if (fin==0) //Si fin es del mismo valor que "0"...
+    {
+        disp=al_create_display(1000,700); //Función que crea la ventana, especificando también su tamaño (x,y).
+        al_set_window_title(disp,"Astroid"); //Función para darle nombre a la ventana. Se especifica "disp" (la ventana creada anteriormente).
+        tempoA = al_create_timer(0.03 );
+        eventos=al_create_event_queue(); //Función para generar la cola o fila de eventos. 
+        al_register_event_source(eventos, al_get_display_event_source(disp)); //Registra lo que sucede en pantalla en la cola de eventos.
+        al_register_event_source(eventos, al_get_timer_event_source(tempoA));
+        al_register_event_source(eventos, al_get_keyboard_event_source());
+        fondo=al_load_bitmap("Imag\\menu.png");
+        fondoPart=al_load_bitmap("Imag\\fndJuego.png");
+        icono=al_load_bitmap("Imag\\icon.png");
+        Enter= al_load_bitmap("Imag\\Enter.png");
+        LetraB= al_load_bitmap("Imag\\TeclaB.png");
+        naveEnemiga= al_load_bitmap("Imag\\navesEnemigas.png");
+        nave= al_load_bitmap("Imag\\nave.png");
+        proyectil=al_load_bitmap("Imag\\disparo.png");
+        imgAst= al_load_bitmap("Imag\\asteroide.png");
+        fuenteTit=al_load_font("font\\fuent1.TTF",100,0);
+        fuenteSecc=al_load_font("font\\fuent1.TTF",60,0);
+        fuenteExp=al_load_font("font\\fuent1.TTF",20,0);
+        fuenteSubt=al_load_font("font\\fuent1.TTF",40,0);
+        fuentePeque=al_load_font("font\\fuent1.TTF",14,0);
+        al_set_display_icon(disp,icono);
+        if(!fuenteTit)
+        {
+            printf("No hay fuente");
+            fin =1;
+        } 
+        if(!fondo || !icono || !fondoPart || !Enter ||!nave ||!imgAst ||!proyectil ||!naveEnemiga)
+        {
+            printf("No se pudo cargar la im%cgen", 160);
+            fin=1;
+        }
+        // Inicializar proyectiles
+        for (int i = 0; i < maxProject; i++) 
+        {
+            proyectiles[i].activo = 0;
+        }
+        // inicializamos los asteroides
+        for (int i = 0; i < maxAST; i++) {
+            asteroides[i].activo = 0;
+        }
+        srand(time(NULL));
+        
+        
+        while (fin==0) //"while" se encargará de cerrar la pantalla
+        {
+                printf("\nse ha iniciado el ciclo");
+                printf("El valor de seleccion es : %i\n",seleccion);
+                printf("El valor de fondo es : %i\n",fond);
+                if(al_event_queue_is_empty(eventos)) //"Si la línea de eventos es vacía"
+                {
+                    if (fond == 0)
+                    {
+                        al_draw_scaled_bitmap(fondo,0,0,728,410,0,0,1000,700,0);
+                        al_draw_text(fuenteTit,al_map_rgb(255,255,255),250,80,0,"ASTROID");
+                    }   // con respecto a la imagen,x,y tamaño y largo de imagen , x,y ---- ya resecto a la ventana , 050
+                    if(scoreBoard == 0)
+                    {
+                        switch(seleccion)
+                        {
+                            
+                            case 0:
+                                al_draw_text(fuenteSecc,al_map_rgb(255,255,255),395,250,0,"START");
+                                al_draw_text(fuenteSecc,al_map_rgb(255,255,255),350,375,0,"TUTORIAL");
+                                al_draw_text(fuenteSecc,al_map_rgb(255,255,255),450,500,0,"EXIT");
+                                al_draw_rectangle(P1,Q1,P2,Q2,al_map_rgb(0,170,0),7);
+                                al_draw_text(fuentePeque, al_map_rgb(223,13,13), 635, 655, 0, "Presiona enter para seleccionar");
+                                al_draw_scaled_bitmap(Enter,0,0,362,368,900,630,60,60,0);
+                                al_draw_text(fuentePeque, al_map_rgb(255,40,10), 50, 650, 0, "Presiona B para ver el historial de puntuaje");
+                                al_draw_scaled_bitmap(LetraB,0,0,98,102,390,620,60,60,0);
+                                break;
+                            case 1:
+                                al_draw_filled_rectangle(100,220,900,650,al_map_rgb(0,0,0));
+                                al_draw_rectangle(100,220,900,650,al_map_rgb(37,209,255),5);
+                                al_draw_text(fuenteSecc,al_map_rgb(255,255,255),530,245,0,"TUTORIAL");
+                                al_draw_text(fuenteSubt,al_map_rgb(255,255,255),170,295,0,"¿Como jugar?");
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 370, 0, "1. Inicio del juego: Desde el menú principal, selecciona");
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 390, 0, "START para comenzar.");
+
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 410, 0, "2. Controla tu nave: Usa las teclas de dirección para mover");
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 430, 0, "la nave por el espacio.");
+
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 460, 0, "3. Dispara: Usa la barra espaciadora para disparar a los");
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 480, 0, "asteroides que se acercan.");
+
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 510, 0, "4. Evita colisiones: Si un asteroide choca contigo,");
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 530, 0, "pierdes una vida.");
+
+                                al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 560, 0, "5. Gana puntos: Cada asteroide destruido te da puntos.");
+
+                                al_draw_text(fuentePeque, al_map_rgb(255,255,255), 570, 610, 0, "Presiona enter para continuar");
+                                al_draw_scaled_bitmap(Enter,0,0,362,368,830,580,60,60,0);
+                                break;
+                            case 2:
+                                al_draw_filled_rectangle(100,220,900,650,al_map_rgb(0,0,0));
+                                al_draw_rectangle(100,220,900,650,al_map_rgb(37,209,255),5);
+                                al_draw_text(fuenteSecc,al_map_rgb(255,255,255),530,225,0,"TUTORIAL");
+                                al_draw_text(fuenteSubt,al_map_rgb(255,255,255),170,295,0,"Controles de juego");
+                                // Título
+                                al_draw_text(fuenteSubt, al_map_rgb(255, 255, 0), 160, 370, 0, "Tecla                Acción");
+
+                                // Controles
+                                al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 420, 0, " W  - - - - - - - - -  Acelera la nave en la dirección actual");
+                                al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 460, 0, " A  - - - - - - - - - - - - - - Gira la nave a la izquierda");
+                                al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 500, 0, " D  - - - - - - - - - - - - - - -Gira la nave a la derecha");
+                                al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 540, 0, " ESPACIO  - - - - - - - - - - Dispara un proyectil");
+                                al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 580, 0, " ESC  - - - - - - - - - - - - - - - - - - - Pausa ");
+
+
+                                // el dibujito de explicacion de abajo
+                                al_draw_text(fuentePeque, al_map_rgb(255,255,255), 570, 610, 0, "Presiona enter para continuar");
+                                al_draw_scaled_bitmap(Enter,0,0,362,368,830,580,60,60,0);
+
+                                
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        al_draw_text(fuenteSecc,al_map_rgb(255,255,255),150,245,0,"ScoreBoard");
+                        al_draw_rectangle(100,220,900,650,al_map_rgb(37,209,255),5);
+                        al_draw_text(fuenteSubt, al_map_rgb(255, 255, 0), 160, 320, 0, "Nombre                Score");
+
+                        
+                        al_draw_text(fuentePeque, al_map_rgb(255,255,255), 570, 610, 0, "Presiona enter para continuar");
+                        al_draw_scaled_bitmap(Enter,0,0,362,368,830,580,60,60,0);
+                        //teorico
+                           
+                    }
+                    al_flip_display();
+                }
+                if(seleccion == 0)
+                {
+                    al_wait_for_event(eventos, &evento); //Espera a que se registre un evento
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("\nVentana cerrada \n");
+                            fin=1;
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            printf("\nAdentro");
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            printf("\nAfuera");
+                            break;
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            printf("Tecla Alegro: %i \n",evento.keyboard.keycode);
+                            if(evento.keyboard.keycode == 2)
+                                scoreBoard = 1;
+                            if(evento.keyboard.keycode == 85)
+                            {
+                                Q1+=125;
+                                Q2+=125;
+                                opc+=1;
+                                if(Q1 > 491)
+                                {
+                                    Q1 = 240;
+                                    Q2 = 340;
+                                    opc = 0;
+                                }
+                            }
+                            if(evento.keyboard.keycode == 84)
+                            {
+                                Q1=Q1-125;
+                                Q2=Q2-125;
+                                opc = opc -1;
+                                if(Q1 < 239)
+                                {
+                                    Q1 = 490;
+                                    Q2 = 590;
+                                    opc = 2;
+                                }
+                            }
+                            if(evento.keyboard.keycode == 67)
+                            {
+                                eleccion(opc);
+                            }
+                            printf("Valor de opc: %i \n",opc);
+                            break;
+                        case ALLEGRO_EVENT_KEY_UP:    
+                            break;
+                    }
+                }   
+                if (seleccion == 1)
+                {
+
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("\nVentana cerrada \n");
+                            fin=1;
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            printf("\nAdentro");
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            printf("\nAfuera");
+                            break;
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            printf("Tecla Alegro: %i \n\n",evento.keyboard.keycode);
+                            if(evento.keyboard.keycode == 67)
+                            {
+                                seleccion = 2;
+                            }
+                            break;
+                        case ALLEGRO_EVENT_KEY_UP:    
+                            break;
+                    }
+                }
+                if(seleccion ==2)
+                {
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("\nVentana cerrada \n");
+                            fin=1;
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            printf("\nAdentro");
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            printf("\nAfuera");
+                            break;
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            printf("Tecla Alegro: %i \n\n",evento.keyboard.keycode);
+                            if(evento.keyboard.keycode == 67)
+                            {
+                                seleccion = 0;
+                            }
+                            
+                            break;
+                        case ALLEGRO_EVENT_KEY_UP:    
+                            break;
+                    }
+                
+                }    
+                if(scoreBoard == 1)
+                {
+                    int regtot;
+                    
+                    leaderBoard = fopen("leaderboard.txt", "r");
+                    char lineas [100][30];
+                    int totalLineas = leerLineasArchivo(leaderBoard,lineas,100);
+
+                    // mostrar los ultimos 5
+                    int inicio;
+                    if(totalLineas <5)
+                    {
+                        inicio = totalLineas -5;
+                    }
+                    else
+                    {
+                        inicio = 0;
+                    }
+                    
+                    int y = 350;
+                    for(int i = inicio; i < totalLineas;i++)
+                    {
+                        al_draw_text(fuenteExp,al_map_rgb(255,255,255),160, y,0,lineas[i]);
+                        y+= 30;
+                    }
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("\nVentana cerrada \n");
+                            fin=1;
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            printf("\nAdentro");
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            printf("\nAfuera");
+                            break;
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            printf("Tecla Alegro: %i \n\n",evento.keyboard.keycode);
+                            if(evento.keyboard.keycode == 67)
+                            {
+                                seleccion = 0;
+                                scoreBoard = 0;
+                                fclose(leaderBoard);
+                            }
+                            
+                            break;
+
+                    }        
+                }
+            if(juego ==1)
+            {
+                char PantallaF = 0;
+                float spawnAst = 0,TempSuma = 0.04;
+                float TempAparicion = 1.2;
+                float tiempoG = 0;
+                char finJueg = 0;
+                int score= 0;
+                char DibujoScore[15];
+                al_start_timer(tempoA);
+                char pausa = 0;
+                float navex=460;
+                float hitboX,hitboY;
+                float navey=310;
+                float naveAng = -1.5708, rotacion = 0.15;
+                float speed = 10;
+                int tecla_W = 0, tecla_A = 0, tecla_D = 0;
+                int creador =0;
+                char projectCounter = 0;
+                int vidas = 3;
+                int framesDesdeUltimoEnemigo = 0 , aparicionesEne=0;;
+                while(finJueg == 0)
+                {
+                    
+                    hitboX=navex-20;
+                    hitboY=navey-20;
+                    if(al_event_queue_is_empty(eventos)) 
+                    {
+                        al_draw_scaled_bitmap(fondoPart,0,0,728,410,0,0,1000,700,0);
+                        al_draw_rotated_bitmap(nave,63/2, 77/2,navex, navey,naveAng+1.5708,0);
+                        //al_draw_rectangle(hitboX,hitboY,hitboX+40,hitboY+40,al_map_rgb(230,0,0),0);
+                        al_draw_rectangle(850,30,990,80,al_map_rgb(255,255,255),0);
+                        if(vidas != 0)
+                        {
+                            if(vidas == 3)
+                            {
+                                al_draw_scaled_bitmap(nave,0,0,63,77,850,30,40,40,0);
+                                al_draw_scaled_bitmap(nave,0,0,63,77,900,30,40,40,0);
+                                al_draw_scaled_bitmap(nave,0,0,63,77,950,30,40,40,0);
+                            }
+                            if(vidas == 2)
+                            {
+                                al_draw_scaled_bitmap(nave,0,0,63,77,900,30,40,40,0);
+                                al_draw_scaled_bitmap(nave,0,0,63,77,950,30,40,40,0);
+                            }
+                            if(vidas == 1)
+                                al_draw_scaled_bitmap(nave,0,0,63,77,950,30,40,40,0);
+                        }
+                        if(projectCounter != 0)
+                        {
+                            for(int i=0;i<maxProject;i++)
+                            {
+                                if(proyectiles[i].activo == 1)
+                                al_draw_rotated_bitmap(proyectil,65/2, 64/2,proyectiles[i].x, proyectiles[i].y,proyectiles[i].angulo+1.5708,0); 
+                            }     
+                        } 
+                        for (int i = 0; i < maxAST; i++) 
+                        {
+                            if (asteroides[i].activo) 
+                            {
+                                al_draw_scaled_bitmap(imgAst,0,0,102,76,asteroides[i].x,asteroides[i].y,100,100,0);
+                            }
+                        }     
+                        for (int i = 0; i < platillosEnemigos; i++) 
+                        {
+                            if (enemigos[i].activo)
+                                al_draw_scaled_bitmap(naveEnemiga, 0, 0, 9990, 9990, enemigos[i].x, enemigos[i].y, 80, 80, 0);
+                        }
+                        for (int i = 0; i < maxDisparoEnemigo; i++) 
+                        {
+                            if (disparosEnemigos[i].activo)
+                                al_draw_filled_circle(disparosEnemigos[i].x, disparosEnemigos[i].y, 10, al_map_rgb(255, 0, 0));
+                        }
+                        sprintf(DibujoScore, "SCORE: %d", score);
+                        al_draw_text(fuenteSubt, al_map_rgb(255, 255, 0), 30, 30, 0, DibujoScore);
+                    }
+                    al_flip_display();
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("ventana closed");
+                            finJueg = 1;
+                            fin = 1;
+                            break;
+
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            break;
+
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            break;
+
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            if(evento.keyboard.keycode == 59)
+                                pausa = 1;
+                            if(evento.keyboard.keycode == 1)  // A
+                                tecla_A = 1;
+                            if(evento.keyboard.keycode == 4)  // D
+                                tecla_D = 1;
+                            if(evento.keyboard.keycode == 23) // W
+                                tecla_W = 1;
+                            if(evento.keyboard.keycode == 75) //Barra espaciadora
+                            {
+                                // ASIGNACION DE VALORES DE LOS PROYECTULES
+                                projectCounter +=1;
+                                proyectiles[projectCounter].activo = 1;
+                                // lo colocamos en el centro de la nave:
+                                proyectiles[projectCounter].x = navex;
+                                proyectiles[projectCounter].y = navey;
+
+                                proyectiles[projectCounter].vx = cosf(naveAng) * 15;
+                                proyectiles[projectCounter].vy = sinf(naveAng) * 15;
+                                // velocidad en dirección naveAng:
+
+                                proyectiles[projectCounter].angulo = naveAng;
+                                
+                            }
+                            break;
+
+                        case ALLEGRO_EVENT_KEY_UP:
+                            if(evento.keyboard.keycode == 1)  // A
+                                tecla_A = 0;
+                            if(evento.keyboard.keycode == 4)  // D
+                                tecla_D = 0;
+                            if(evento.keyboard.keycode == 23) // W
+                                tecla_W = 0;
+                            break;
+
+                        case ALLEGRO_EVENT_TIMER:
+                            // nave que ataca
+                            framesDesdeUltimoEnemigo++;
+                            //asteroides
+                            spawnAst += TempSuma;
+                            tiempoG += 0.02;
+                            if (tiempoG >= 17)
+                            {
+                                if (TempAparicion > 0.3)
+                                {
+                                    tiempoG = 0;
+                                    TempAparicion -= 0.3;
+                                    printf("\nel tiempo de aparicion a disminuido");
+                                }
+                                tiempoG = 0;
+                            }
+
+                           
+                            if(spawnAst >= TempAparicion)
+                            {
+                                printf("ast");
+                                spawnAst =0;
+                                // busca un hueco libre
+                                for (int i = 0; i < maxAST; i++) {
+                                    if (asteroides[i].activo == 0) 
+                                    {
+                                        asteroides[i].activo = 1;
+                                        // definimos el angulo para que el asteroide no vaya hacia direcciones que no tengan nada que ver
+                                        float AstAngu =0;
+                                        // spawn en un borde al azar
+                                        int lado = rand() % 5;
+                                        switch (lado) 
+                                        {
+                                            case 0: //izq
+                                                printf("\nladoizq");
+                                                asteroides[i].x = -50;          
+                                                asteroides[i].y = rand() % 700; 
+                                                AstAngu=-3.141592 / 2 + ((float)rand() / RAND_MAX) * ALLEGRO_PI;
+                                                break;
+
+                                            case 1: //derecha
+                                                printf("\nladoder");
+                                                asteroides[i].x = 1000 + 50;     
+                                                asteroides[i].y = rand() % 700;
+                                                AstAngu = 3.141592/2 + ((float)rand() / RAND_MAX) * (3.1415892*3/2 - 3.14159/2);
+                                                break;
+
+                                            case 2: //arriba
+                                                printf("\nladoarriba");
+                                                asteroides[i].x = rand() % 1000; 
+                                                asteroides[i].y = -50; 
+                                                AstAngu =  3.141592 / 2 + ((float)rand() / RAND_MAX) * 3.141592;
+                                                break;
+
+                                            case 3:
+                                            {
+                                                printf("random");
+                                                char verdad =0;
+                                                float tempX,tempY;
+                                                do {
+                                                    tempX = rand() % 1000;
+                                                    tempY = rand() % 700;
+                                            
+                                                    float dx = tempX - navex;
+                                                    float dy = tempY - navey;
+                                                    float distancia = sqrtf(dx * dx + dy * dy);
+                                            
+                                                    if (distancia >= 150.0f) 
+                                                    {
+                                                        verdad = 1; // ubicación válida
+                                                        asteroides[i].x = tempX;
+                                                        asteroides[i].y = tempY;
+                                                    }
+                                                } while (verdad == 0);
+                                                AstAngu = ((float)rand() / RAND_MAX) * ALLEGRO_PI * 2; // dirección aleatoria
+                                                break;
+                                            }
+                                            case 4: //abajo
+                                                printf("\nladoabajo");
+                                                asteroides[i].x = rand() % 1000; 
+                                                asteroides[i].y = 700 + 50; 
+                                                AstAngu =3.141592 + ((float)rand() / RAND_MAX) * 3.141592;
+                                                break;
+                                        }
+                                        // velocidad y dirección aleatoria
+                                        
+                                        float speedAst = 2 + rand() % 3;  // entre 2 y 4
+                                        asteroides[i].vx = cosf(AstAngu) * speedAst;
+                                        asteroides[i].vy = sinf(AstAngu) * speedAst;
+                                        break;
+                                    }
+                                }
+                            }
+                            for (int i = 0; i < maxAST; i++) 
+                            {
+                                if (asteroides[i].activo) 
+                                {
+                                    asteroides[i].x += asteroides[i].vx;
+                                    asteroides[i].y += asteroides[i].vy;
+                                    if (asteroides[i].x < -60 || asteroides[i].x > 1060 || asteroides[i].y < -60 || asteroides[i].y > 760) 
+                                    {
+                                        asteroides[i].activo = 0;
+                                    }
+                                }
+                            }
+                            // Aplica el movimiento continuo en cada frame del timer
+                            if(tecla_A != 0)
+                                naveAng -= rotacion;
+                            if(tecla_D != 0)
+                                naveAng += rotacion;
+                            if(tecla_W != 0)
+                            {
+                                navex += cosf(naveAng) * speed;
+                                navey += sinf(naveAng) * speed;
+                                if(navex > 1020) navex = 0;
+                                if(navey > 700) navey = 0;
+                                if(navex < -10) navex = 1020;
+                                if(navey < -10) navey = 700;
+                            }
+                            //Disparo de la nave
+                            
+                            for (int i = 0; i < maxProject; i++) 
+                            {
+                                if (proyectiles[i].activo == 1) 
+                                {
+                                    // Mover
+                                    proyectiles[i].x += proyectiles[i].vx;
+                                    proyectiles[i].y += proyectiles[i].vy;
+                                    // Desactivar si sale de pantalla
+                                    if (proyectiles[i].x < -10 || proyectiles[i].x > 1010|| proyectiles[i].y < -10 || proyectiles[i].y > 710) 
+                                    {
+                                        proyectiles[i].activo = 0;
+                                        projectCounter -=1;
+                                    }
+                                }
+                                
+                            }  
+                            for (int i = 0; i < maxProject; i++)
+                            {
+                                if (proyectiles[i].activo)
+                                {
+                                    for (int j = 0; j < maxAST; j++) 
+                                    {
+                                        if (asteroides[j].activo) 
+                                        {
+                                            // Comprobar colisión simple (caja AABB)
+                                            if (proyectiles[i].x > asteroides[j].x && proyectiles[i].x < asteroides[j].x + 100 && proyectiles[i].y > asteroides[j].y && proyectiles[i].y < asteroides[j].y + 100) 
+                                            {
+                                                // Colisión detectada
+                                                proyectiles[i].activo = 0;
+                                                asteroides[j].activo = 0;
+                                                projectCounter--;
+                                                printf(" Asteroide destruido!\n");
+                                                score += 15;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            for (int i = 0; i < maxAST; i++) 
+                            {
+                                if (asteroides[i].activo) 
+                                {
+                                    // AABB (colisión por caja)
+                                    if (hitboX < asteroides[i].x + 100 && hitboX + 40 > asteroides[i].x && hitboY < asteroides[i].y + 100 && hitboY + 40 > asteroides[i].y) 
+                                    {
+                                        
+                                        printf("¡Colisión con la nave!\n");
+                                        asteroides[i].activo = 0;
+                            
+                                        vidas--; // Quitamos una vida
+                                        printf("Vidas restantes: %d\n", vidas);
+                            
+                                        if (vidas <= 0) 
+                                        {
+                                            printf("¡Juego terminado!\n");
+                                            finJueg = 1;
+                                        } 
+                                        else 
+                                        {
+                                            // Reseteamos posición de la nave
+                                            navex = 460;
+                                            navey = 310;
+                                        }
+                                    }
+                                }
+                            }
+                            if(framesDesdeUltimoEnemigo >= 500)
+                            {
+                                aparicionesEne++;
+                                if(aparicionesEne < 4)
+                                    framesDesdeUltimoEnemigo = 0;
+                                if(aparicionesEne > 4)
+                                    framesDesdeUltimoEnemigo =250;
+                                for (int i = 0; i < platillosEnemigos; i++) 
+                               {
+                                    if (!enemigos[i].activo) 
+                                    {
+                                        enemigos[i].x = rand() % 1000;
+                                        enemigos[i].y = rand() % 700;
+                                        enemigos[i].vx = (rand() % 3 + 1) * (rand() % 2 == 0 ? 1 : -1);
+                                        enemigos[i].vy = (rand() % 3 + 1) * (rand() % 2 == 0 ? 1 : -1);
+                                        enemigos[i].activo = 1;
+                                        enemigos[i].disparoTimer = 60;
+                                        framesDesdeUltimoEnemigo = 0;
+                                        break;
+                                    }
+                                }
+                            }
+                            for (int i = 0; i < platillosEnemigos; i++) 
+                            {
+                                if (enemigos[i].activo) 
+                                {
+                                    enemigos[i].x += enemigos[i].vx;
+                                    enemigos[i].y += enemigos[i].vy;
+                            
+                                    // Rebote en pantalla
+                                    if (enemigos[i].x < 0 || enemigos[i].x > 1000) enemigos[i].vx *= -1;
+                                    if (enemigos[i].y < 0 || enemigos[i].y > 700) enemigos[i].vy *= -1;
+                            
+                                    enemigos[i].disparoTimer--;
+                                    if (enemigos[i].disparoTimer <= 0) 
+                                    {
+                                        // Disparo
+                                        for (int j = 0; j < maxDisparoEnemigo; j++) 
+                                        {
+                                            if (!disparosEnemigos[j].activo)
+                                            {
+                                                disparosEnemigos[j].x = enemigos[i].x;
+                                                disparosEnemigos[j].y = enemigos[i].y;
+                                                float dx = navex - enemigos[i].x;
+                                                float dy = navey - enemigos[i].y;
+                                                float dist = sqrtf(dx*dx + dy*dy);
+                                                disparosEnemigos[j].vx = dx / dist * 6;
+                                                disparosEnemigos[j].vy = dy / dist * 6;
+                                                disparosEnemigos[j].activo = 1;
+                                                break;
+                                            }
+                                        }
+                                        enemigos[i].disparoTimer = 100 + rand() % 100;
+                                    }
+                                }
+                            }
+                            for (int i = 0; i < maxDisparoEnemigo; i++) 
+                            {
+                                if (disparosEnemigos[i].activo) 
+                                {
+                                    disparosEnemigos[i].x += disparosEnemigos[i].vx;
+                                    disparosEnemigos[i].y += disparosEnemigos[i].vy;
+                                    if (disparosEnemigos[i].x < 0 || disparosEnemigos[i].x > 1000 || disparosEnemigos[i].y < 0 || disparosEnemigos[i].y > 700)
+                                        disparosEnemigos[i].activo = 0;
+                                }
+                            }
+                            for (int i = 0; i < maxDisparoEnemigo; i++) 
+                            {
+                                if (disparosEnemigos[i].activo) 
+                                {
+                                    if (hitboX < disparosEnemigos[i].x && hitboX + 50 > disparosEnemigos[i].x && hitboY < disparosEnemigos[i].y && hitboY + 50 > disparosEnemigos[i].y) 
+                                    {
+                                        disparosEnemigos[i].activo = 0;
+                                        vidas--;
+                                        if (vidas <= 0) 
+                                        {
+                                            finJueg = 1;
+                                        } else {
+                                            navex = 460;
+                                            navey = 310;
+                                        }
+                                    }
+                                }
+                            }
+                            for (int i = 0; i < maxProject; i++) 
+                            {
+                                if (proyectiles[i].activo) 
+                                {
+                                    for (int j = 0; j < platillosEnemigos; j++) 
+                                    {
+                                        if (enemigos[j].activo) 
+                                        {
+                                            float dx = proyectiles[i].x - enemigos[j].x;
+                                            float dy = proyectiles[i].y - enemigos[j].y;
+                                            float distancia = sqrt(dx * dx + dy * dy);
+                            
+                                            if (distancia < 80) //radio de colision
+                                            {
+                                                enemigos[j].activo = 0;   // Eliminar nave enemiga
+                                                proyectiles[i].activo = 0;   // Eliminar disparo
+                                                score += 30;                 // Aumentar puntos si querés
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            break;
+                    }
+
+                }
+                PantallaF = 1;
+                char nickname[6] = "";
+                int longitud = 0;
+                while(PantallaF == 1)
+                {
+                    
+                    if(al_event_queue_is_empty(eventos)) 
+                    {
+                        al_draw_scaled_bitmap(fondoPart,0,0,728,410,0,0,1000,700,0);
+                        al_draw_text(fuenteSecc,al_map_rgb(255,255,255),350,225,0,"Perdiste ...");
+                        al_draw_text(fuenteSubt, al_map_rgb(255, 255, 0), 390, 300, 0, DibujoScore);
+                        al_draw_rectangle(350,450,650,550,al_map_rgb(255,255,255),0);
+                        al_draw_text(fuenteSubt, al_map_rgb(0, 255, 0), 380, 470, 0, nickname);
+                        al_draw_text(fuenteSubt,al_map_rgb(255,255,255),390,560,0," Nombre o apoco");
+                        al_draw_text(fuentePeque,al_map_rgb(255,255,255),350,410,0,"Max 5 caracteres,Letras y numeros");
+
+                        al_draw_text(fuentePeque, al_map_rgb(255,255,255), 600, 640, 0, "Presiona enter para continuar");
+                        al_draw_scaled_bitmap(Enter,0,0,362,368,860,610,60,60,0);
+
+                    }
+                    al_flip_display();
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("ventana closed");
+                            fin = 1;
+                            PantallaF = 0;
+                            finJueg = 1;
+                            break;
+
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            break;
+
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            break;
+
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            for(int i=0;i<6;i++)
+                                printf("[%c]",nickname[i]);
+                                if (evento.keyboard.keycode == 67 && longitud <= 5)
+                                {
+                                    // 3) Abrir, escribir y cerrar el archivo SOLO aquí
+                                    leaderBoard= fopen("leaderboard.txt", "a");
+                                    if (leaderBoard)
+                                    {
+                                        fprintf(leaderBoard, "%s %d\n", nickname, score);
+                                        fclose(leaderBoard);
+                                    }
+                                    PantallaF = 0;
+                                }
+                                break;
+                        case ALLEGRO_EVENT_KEY_CHAR:
+                            if ((evento.keyboard.unichar >= 'a' && evento.keyboard.unichar <= 'z') || (evento.keyboard.unichar >= 'A' && evento.keyboard.unichar <= 'Z') || (evento.keyboard.unichar >= '0' && evento.keyboard.unichar <= '9')) 
+                            {
+                                if (longitud < 5) 
+                                {
+                                    nickname[longitud++] = evento.keyboard.unichar;
+                                    nickname[longitud] = '\0';
+                                }
+                            }
+                            else if (evento.keyboard.keycode == ALLEGRO_KEY_BACKSPACE && longitud > 0)
+                            {
+                                nickname[--longitud] = '\0';
+                            }
+                            printf("preciono %c",evento.keyboard.unichar );
+                            break;
+                    }        
+                }    
+                juego = 0;
+                seleccion = 0;
+            }
+        }
+
+        al_destroy_display(disp); //Función para destruir la ventana. Se especifica "disp" (la ventana creada anteriormente).
+        al_destroy_event_queue(eventos);
+        al_destroy_bitmap(fondo);
+        al_destroy_bitmap(fondoPart);
+        al_destroy_bitmap(icono);
+        al_destroy_bitmap(Enter);
+        al_destroy_bitmap(nave);
+        al_destroy_bitmap(LetraB);
+        al_destroy_bitmap(proyectil);
+        al_destroy_bitmap(naveEnemiga);
+        al_destroy_bitmap(imgAst);
+        al_destroy_font(fuenteTit);
+        al_destroy_font(fuenteSecc);
+        al_destroy_font(fuenteSubt);
+        al_destroy_font(fuenteExp);
+        al_destroy_font(fuentePeque);
+        al_destroy_timer(tempoA);
+    }
+    return 0;
+}

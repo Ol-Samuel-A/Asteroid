@@ -1,0 +1,526 @@
+#include <stdio.h>
+#include <allegro5\allegro.h>
+#include <allegro5\allegro_image.h>
+#include <allegro5\allegro_font.h>
+#include <allegro5\allegro_ttf.h>
+#include <allegro5\allegro_primitives.h>
+#include <math.h>
+#include <stdlib.h>   
+#include <time.h>
+char fin=0;  //Variable que permite dar el fin.
+char fond = 0;
+int seleccion =0;
+int juego=0;
+#define maxAST 15
+#define maxProject 10
+typedef struct {
+    float x, y;
+    float vx, vy;
+    int activo;
+} Asteroide;
+Asteroide asteroides[maxAST];
+typedef struct {
+    float x, y;
+    float vx, vy;
+    float angulo;
+    int activo;
+} Projectil;
+Projectil proyectiles[maxProject];
+void eleccion(int opc)
+{
+    switch(opc)
+    {
+        case 0:
+            juego =1;
+            break;
+        case 1:
+            seleccion = 1;
+            break;
+        case 2:
+            fin = 1;
+    }
+    return;
+}
+char inicia(void)
+{
+    char fin=0;
+    if(!al_init())
+    {
+        printf("No allegro");
+        fin = 1;
+    }
+    if(!al_init_image_addon())
+    {
+        printf("No se pueden inicializar im%cgenes", 160);
+        fin=1;
+    }
+    if(!al_init_font_addon()|| !al_init_ttf_addon())
+    {
+        printf("No se iniciaron las fuentes");
+        fin = 1;
+    }
+    if(!al_install_keyboard())
+    {
+        printf("No se instalo teclado");
+        fin = 1;
+    }
+    if(!al_init_primitives_addon())
+    {
+        printf("No se pudo iniciar primitives");
+        fin = 1;
+    }
+    return fin;
+}
+
+int main (void)
+{
+    ALLEGRO_DISPLAY *disp; //*disp es un apuntador a ALLEGRO_DISPLAY. ALLEGRO_DISPLAY es el tipo de dato compuesto. Es una especie de arreglo.
+    ALLEGRO_EVENT_QUEUE *eventos; //*eventos es un apuntador a ALLEGRO_EVENT_QUEUE.
+    ALLEGRO_EVENT evento; //eventos es una estructura. Este guarda el evento en si, y lo manda a *eventos.
+    ALLEGRO_BITMAP *fondo;
+    ALLEGRO_BITMAP *fondoPart;
+    ALLEGRO_BITMAP *Enter;
+    ALLEGRO_BITMAP *icono;
+    ALLEGRO_BITMAP *nave;
+    ALLEGRO_BITMAP *imgAst;
+    ALLEGRO_BITMAP *proyectil;
+    ALLEGRO_FONT *fuenteTit;
+    ALLEGRO_FONT *fuenteSecc;
+    ALLEGRO_FONT *fuenteSubt;
+    ALLEGRO_FONT *fuenteExp;
+    ALLEGRO_FONT *fuentePeque;
+    ALLEGRO_TIMER *tempoA;
+    float P1=335,Q1=240,P2=715,Q2=340; // son para la seleccion de el menu 
+    char opc = 0; //seleccionar la opcion del menu
+    fin= inicia();
+    if (fin==0) //Si fin es del mismo valor que "0"...
+    {
+        disp=al_create_display(1000,700); //Función que crea la ventana, especificando también su tamaño (x,y).
+        al_set_window_title(disp,"Astroid"); //Función para darle nombre a la ventana. Se especifica "disp" (la ventana creada anteriormente).
+        tempoA = al_create_timer(0.03);
+        eventos=al_create_event_queue(); //Función para generar la cola o fila de eventos. 
+        al_register_event_source(eventos, al_get_display_event_source(disp)); //Registra lo que sucede en pantalla en la cola de eventos.
+        al_register_event_source(eventos, al_get_timer_event_source(tempoA));
+        al_register_event_source(eventos, al_get_keyboard_event_source());
+        fondo=al_load_bitmap("Imag\\menu.png");
+        fondoPart=al_load_bitmap("Imag\\fndJuego.png");
+        icono=al_load_bitmap("Imag\\icon.png");
+        Enter= al_load_bitmap("Imag\\Enter.png");
+        nave= al_load_bitmap("Imag\\nave.png");
+        proyectil=al_load_bitmap("Imag\\disparo.png");
+        imgAst= al_load_bitmap("Imag\\asteroide.png");
+        fuenteTit=al_load_font("font\\fuent1.TTF",100,0);
+        fuenteSecc=al_load_font("font\\fuent1.TTF",60,0);
+        fuenteExp=al_load_font("font\\fuent1.TTF",20,0);
+        fuenteSubt=al_load_font("font\\fuent1.TTF",40,0);
+        fuentePeque=al_load_font("font\\fuent1.TTF",14,0);
+        al_set_display_icon(disp,icono);
+        if(!fuenteTit)
+        {
+            printf("No hay fuente");
+            fin =1;
+        } 
+        if(!fondo || !icono || !fondoPart || !Enter ||!nave ||!imgAst ||!proyectil)
+        {
+            printf("No se pudo cargar la im%cgen", 160);
+            fin=1;
+        }
+        // Inicializar proyectiles
+        for (int i = 0; i < maxProject; i++) 
+        {
+            proyectiles[i].activo = 0;
+        }
+        // inicializamos los asteroides
+        for (int i = 0; i < maxAST; i++) {
+            asteroides[i].activo = 0;
+        }
+        srand(time(NULL));
+        float spawnAst = 0;
+        
+        while (fin==0) //"while" se encargará de cerrar la pantalla
+        {
+                printf("\nse ha iniciado el ciclo");
+                printf("El valor de seleccion es : %i\n",seleccion);
+                printf("El valor de fondo es : %i\n",fond);
+                if(al_event_queue_is_empty(eventos)) //"Si la línea de eventos es vacía"
+                {
+                    if (fond == 0)
+                    {
+                        al_draw_scaled_bitmap(fondo,0,0,728,410,0,0,1000,700,0);
+                        al_draw_text(fuenteTit,al_map_rgb(255,255,255),250,80,0,"ASTROID");
+                    }   // con respecto a la imagen,x,y tamaño y largo de imagen , x,y ---- ya resecto a la ventana , 050
+                    switch(seleccion)
+                    {
+                        
+                        case 0:
+                            al_draw_text(fuenteSecc,al_map_rgb(255,255,255),395,250,0,"START");
+                            al_draw_text(fuenteSecc,al_map_rgb(255,255,255),350,375,0,"TUTORIAL");
+                            al_draw_text(fuenteSecc,al_map_rgb(255,255,255),450,500,0,"EXIT");
+                            al_draw_rectangle(P1,Q1,P2,Q2,al_map_rgb(0,170,0),7);
+                            al_draw_text(fuentePeque, al_map_rgb(223,13,13), 635, 655, 0, "Presiona enter para seleccionar");
+                            al_draw_scaled_bitmap(Enter,0,0,362,368,900,630,60,60,0);
+                            break;
+                        case 1:
+                            al_draw_filled_rectangle(100,220,900,650,al_map_rgb(0,0,0));
+                            al_draw_rectangle(100,220,900,650,al_map_rgb(37,209,255),5);
+                            al_draw_text(fuenteSecc,al_map_rgb(255,255,255),530,245,0,"TUTORIAL");
+                            al_draw_text(fuenteSubt,al_map_rgb(255,255,255),170,295,0,"¿Como jugar?");
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 370, 0, "1. Inicio del juego: Desde el menú principal, selecciona");
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 390, 0, "START para comenzar.");
+
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 410, 0, "2. Controla tu nave: Usa las teclas de dirección para mover");
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 430, 0, "la nave por el espacio.");
+
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 460, 0, "3. Dispara: Usa la barra espaciadora para disparar a los");
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 480, 0, "asteroides que se acercan.");
+
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 510, 0, "4. Evita colisiones: Si un asteroide choca contigo,");
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 180, 530, 0, "pierdes una vida.");
+
+                            al_draw_text(fuenteExp, al_map_rgb(255,255,255), 150, 560, 0, "5. Gana puntos: Cada asteroide destruido te da puntos.");
+
+                            al_draw_text(fuentePeque, al_map_rgb(255,255,255), 570, 610, 0, "Presiona enter para continuar");
+                            al_draw_scaled_bitmap(Enter,0,0,362,368,830,580,60,60,0);
+                            break;
+                        case 2:
+                            al_draw_filled_rectangle(100,220,900,650,al_map_rgb(0,0,0));
+                            al_draw_rectangle(100,220,900,650,al_map_rgb(37,209,255),5);
+                            al_draw_text(fuenteSecc,al_map_rgb(255,255,255),530,225,0,"TUTORIAL");
+                            al_draw_text(fuenteSubt,al_map_rgb(255,255,255),170,295,0,"Controles de juego");
+                            // Título
+                            al_draw_text(fuenteSubt, al_map_rgb(255, 255, 0), 160, 370, 0, "Tecla                Acción");
+
+                            // Controles
+                            al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 420, 0, " W  - - - - - - - - -  Acelera la nave en la dirección actual");
+                            al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 460, 0, " A  - - - - - - - - - - - - - - Gira la nave a la izquierda");
+                            al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 500, 0, " D  - - - - - - - - - - - - - - -Gira la nave a la derecha");
+                            al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 540, 0, " ESPACIO  - - - - - - - - - - Dispara un proyectil");
+                            al_draw_text(fuenteExp, al_map_rgb(255, 255, 255), 160, 580, 0, " ESC  - - - - - - - - - - - - - - - - - - - Pausa ");
+
+
+                            // el dibujito de explicacion de abajo
+                            al_draw_text(fuentePeque, al_map_rgb(255,255,255), 570, 610, 0, "Presiona enter para continuar");
+                            al_draw_scaled_bitmap(Enter,0,0,362,368,830,580,60,60,0);
+                            break;
+                    }
+                    al_flip_display();
+                }
+                if(seleccion == 0)
+                {
+                    al_wait_for_event(eventos, &evento); //Espera a que se registre un evento
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("\nVentana cerrada \n");
+                            fin=1;
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            printf("\nAdentro");
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            printf("\nAfuera");
+                            break;
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            printf("Tecla Alegro: %i \n",evento.keyboard.keycode);
+                            if(evento.keyboard.keycode == 85)
+                            {
+                                Q1+=125;
+                                Q2+=125;
+                                opc+=1;
+                                if(Q1 > 491)
+                                {
+                                    Q1 = 240;
+                                    Q2 = 340;
+                                    opc = 0;
+                                }
+                            }
+                            if(evento.keyboard.keycode == 84)
+                            {
+                                Q1=Q1-125;
+                                Q2=Q2-125;
+                                opc = opc -1;
+                                if(Q1 < 239)
+                                {
+                                    Q1 = 490;
+                                    Q2 = 590;
+                                    opc = 2;
+                                }
+                            }
+                            if(evento.keyboard.keycode == 67)
+                            {
+                                eleccion(opc);
+                            }
+                            printf("Valor de opc: %i \n",opc);
+                            break;
+                        case ALLEGRO_EVENT_KEY_UP:    
+                            break;
+                    }
+                }   
+                if (seleccion == 1)
+                {
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("\nVentana cerrada \n");
+                            fin=1;
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            printf("\nAdentro");
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            printf("\nAfuera");
+                            break;
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            printf("Tecla Alegro: %i \n\n",evento.keyboard.keycode);
+                            if(evento.keyboard.keycode == 67)
+                            {
+                                seleccion = 2;
+                            }
+                            break;
+                        case ALLEGRO_EVENT_KEY_UP:    
+                            break;
+                    }
+                }
+                if(seleccion ==2)
+                {
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("\nVentana cerrada \n");
+                            fin=1;
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            printf("\nAdentro");
+                            break;
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            printf("\nAfuera");
+                            break;
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            printf("Tecla Alegro: %i \n\n",evento.keyboard.keycode);
+                            if(evento.keyboard.keycode == 67)
+                            {
+                                seleccion = 0;
+                            }
+                            
+                            break;
+                        case ALLEGRO_EVENT_KEY_UP:    
+                            break;
+                    }
+                
+            }    
+            if(juego ==1)
+            {
+                char finJueg = 0;
+                al_start_timer(tempoA);
+                char pausa = 0;
+                float navex=460;
+                float hitboX,hitboY;
+                float navey=310;
+                float naveAng = -1.5708, rotacion = 0.15;
+                float speed = 10;
+                int tecla_W = 0, tecla_A = 0, tecla_D = 0;
+                int creador =0;
+                char projectCounter = 0;
+                while(finJueg == 0)
+                {
+                    
+                    hitboX=navex-20;
+                    hitboY=navey-20;
+                    if(al_event_queue_is_empty(eventos)) //"Si la línea de eventos es vacía"
+                    {
+                        al_draw_scaled_bitmap(fondoPart,0,0,728,410,0,0,1000,700,0);
+                        al_draw_rotated_bitmap(nave,63/2, 77/2,navex, navey,naveAng+1.5708,0);
+                        al_draw_rectangle(hitboX,hitboY,hitboX+40,hitboY+40,al_map_rgb(230,0,0),0);
+                        if(projectCounter != 0)
+                        {
+                            for(int i=0;i<maxProject;i++)
+                            {
+                                if(proyectiles[i].activo == 1)
+                                al_draw_rotated_bitmap(proyectil,65/2, 64/2,proyectiles[i].x, proyectiles[i].y,proyectiles[i].angulo+1.5708,0); 
+                            }     
+                        } 
+                        for (int i = 0; i < maxAST; i++) 
+                        {
+                            if (asteroides[i].activo) 
+                            {
+                                al_draw_scaled_bitmap(imgAst,0,0,102,76,asteroides[i].x,asteroides[i].y,100,100,0);
+                            }
+                        }      
+                        
+                    }
+                    al_flip_display();
+                    al_wait_for_event(eventos, &evento);
+                    switch(evento.type)
+                    {
+                        case ALLEGRO_EVENT_DISPLAY_CLOSE:
+                            printf("ventana closed");
+                            finJueg = 1;
+                            fin = 1;
+                            break;
+
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_IN:
+                            break;
+
+                        case ALLEGRO_EVENT_DISPLAY_SWITCH_OUT:
+                            break;
+
+                        case ALLEGRO_EVENT_KEY_DOWN:
+                            if(evento.keyboard.keycode == 59)
+                                pausa = 1;
+                            if(evento.keyboard.keycode == 1)  // A
+                                tecla_A = 1;
+                            if(evento.keyboard.keycode == 4)  // D
+                                tecla_D = 1;
+                            if(evento.keyboard.keycode == 23) // W
+                                tecla_W = 1;
+                            if(evento.keyboard.keycode == 75) //Barra espaciadora
+                            {
+                                // ASIGNACION DE VALORES DE LOS PROYECTULES
+                                projectCounter +=1;
+                                proyectiles[projectCounter].activo = 1;
+                                // lo colocamos en el centro de la nave:
+                                proyectiles[projectCounter].x = navex;
+                                proyectiles[projectCounter].y = navey;
+
+                                proyectiles[projectCounter].vx = cosf(naveAng) * 15;
+                                proyectiles[projectCounter].vy = sinf(naveAng) * 15;
+                                // velocidad en dirección naveAng:
+
+                                proyectiles[projectCounter].angulo = naveAng;
+                                
+                            }
+                            break;
+
+                        case ALLEGRO_EVENT_KEY_UP:
+                            if(evento.keyboard.keycode == 1)  // A
+                                tecla_A = 0;
+                            if(evento.keyboard.keycode == 4)  // D
+                                tecla_D = 0;
+                            if(evento.keyboard.keycode == 23) // W
+                                tecla_W = 0;
+                            break;
+
+                        case ALLEGRO_EVENT_TIMER:
+                            //asteroides
+                            spawnAst += 0.02;
+                            if(spawnAst >= 1.2)
+                            {
+                                printf("ast");
+                                spawnAst =0;
+                                // busca un hueco libre
+                                for (int i = 0; i < maxAST; i++) {
+                                    if (asteroides[i].activo == 0) 
+                                    {
+                                        asteroides[i].activo = 1;
+                                        // definimos el angulo para que el asteroide no vaya hacia direcciones que no tengan nada que ver
+                                        float AstAngu =0;
+                                        // spawn en un borde al azar
+                                        int lado = rand() % 4;
+                                        switch (lado) 
+                                        {
+                                            case 0: //izq
+                                                printf("\nladoizq");
+                                                asteroides[i].x = -50;          
+                                                asteroides[i].y = rand() % 700; 
+                                                AstAngu=-3.141592 / 2 + ((float)rand() / RAND_MAX) * ALLEGRO_PI;
+                                                break;
+                                            case 1: //derecha
+                                                printf("\nladoder");
+                                                asteroides[i].x = 1000 + 50;     
+                                                asteroides[i].y = rand() % 700;
+                                                AstAngu = 3.141592/2 + ((float)rand() / RAND_MAX) * (3.1415892*3/2 - 3.14159/2);
+                                                break;
+                                            case 2: //arriba
+                                                printf("\nladoarriba");
+                                                asteroides[i].x = rand() % 1000; 
+                                                asteroides[i].y = -50; 
+                                                AstAngu =  3.141592 / 2 + ((float)rand() / RAND_MAX) * 3.141592;
+                                                break;
+                                            default: //abajo
+                                                printf("\nladoabajo");
+                                                asteroides[i].x = rand() % 1000; 
+                                                asteroides[i].y = 700 + 50; 
+                                                AstAngu =3.141592 + (float)rand() / RAND_MAX * 3.141592;
+                                                
+                                                break;
+                                        }
+                                        // velocidad y dirección aleatoria
+                                        
+                                        float speedAst = 2 + rand() % 3;  // entre 2 y 4
+                                        asteroides[i].vx = cosf(AstAngu) * speedAst;
+                                        asteroides[i].vy = sinf(AstAngu) * speedAst;
+                                        break;
+                                    }
+                                }
+                            }
+                            for (int i = 0; i < maxAST; i++) 
+                            {
+                                if (asteroides[i].activo) 
+                                {
+                                    asteroides[i].x += asteroides[i].vx;
+                                    asteroides[i].y += asteroides[i].vy;
+                                    if (asteroides[i].x < -60 || asteroides[i].x > 1060 || asteroides[i].y < -60 || asteroides[i].y > 760) 
+                                    {
+                                        asteroides[i].activo = 0;
+                                    }
+                                }
+                            }
+                            // Aplica el movimiento continuo en cada frame del timer
+                            if(tecla_A != 0)
+                                naveAng -= rotacion;
+                            if(tecla_D != 0)
+                                naveAng += rotacion;
+                            if(tecla_W != 0)
+                            {
+                                navex += cosf(naveAng) * speed;
+                                navey += sinf(naveAng) * speed;
+                                if(navex > 1020) navex = 0;
+                                if(navey > 700) navey = 0;
+                                if(navex < -10) navex = 1020;
+                                if(navey < -10) navey = 700;
+                            }
+                            //Disparo de la nave
+                            
+                            for (int i = 0; i < maxProject; i++) 
+                            {
+                                if (proyectiles[i].activo == 1) 
+                                {
+                                    // Mover
+                                    proyectiles[i].x += proyectiles[i].vx;
+                                    proyectiles[i].y += proyectiles[i].vy;
+                                    // Desactivar si sale de pantalla
+                                    if (proyectiles[i].x < -10 || proyectiles[i].x > 1010|| proyectiles[i].y < -10 || proyectiles[i].y > 710) 
+                                    {
+                                        proyectiles[i].activo = 0;
+                                        projectCounter -=1;
+                                    }
+                                }
+                                
+                            }  
+                              
+                            break;
+                    }
+
+                }
+            }
+        }
+        al_destroy_display(disp); //Función para destruir la ventana. Se especifica "disp" (la ventana creada anteriormente).
+        al_destroy_event_queue(eventos);
+        al_destroy_bitmap(fondo);
+        al_destroy_bitmap(fondoPart);
+        al_destroy_bitmap(icono);
+        al_destroy_bitmap(Enter);
+        al_destroy_bitmap(nave);
+        al_destroy_bitmap(proyectil);
+        al_destroy_bitmap(imgAst);
+        al_destroy_font(fuenteTit);
+        al_destroy_font(fuenteSecc);
+        al_destroy_font(fuenteSubt);
+        al_destroy_font(fuenteExp);
+        al_destroy_font(fuentePeque);
+        al_destroy_timer(tempoA);
+    }
+    return 0;
+}
